@@ -13,16 +13,16 @@ from psycopg2.sql import Identifier as PgI, Literal as PgL, SQL as PgQ
 def do_iam_auth(con_args: Dict[str, Any]):
     if con_args['password'] == 'IAM':
         from awspy.rds import RDS
-        token = RDS().iam_auth(con_args['database'], con_args['port'], con_args['user'])
+        token = RDS().iam_auth(con_args['host'], con_args['port'], con_args['user'])
         con_args['password'] = token
 
 def read_con_args_from_env(env: str):
     con_args = {
         'host':     os.environ[f'{env}_DB_HOST'],
         'port':     os.environ[f'{env}_DB_PORT'],
-        'database': os.environ[f'{env}_DB_NAME'],
         'user':     os.environ[f'{env}_DB_USER'],
         'password': os.environ[f'{env}_DB_PASS'],
+        'database': os.environ[f'{env}_DB_NAME'],
     }
     if f'{env}_DB_APP' in os.environ:
         con_args['application_name'] = os.environ[f'{env}_DB_APP'],
@@ -94,6 +94,18 @@ class PgSQL():
             self.con = self.connect()
             self.con_last = datetime.now()
         return self.con
+
+    def create_db(self, name: str):
+        con_args = self.con_args.copy()
+        con_args['database'] = 'postgres'
+        con = self.connect(con_args)
+        con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+        cur = con.cursor()
+        query = PgQ('CREATE DATABASE {db_name}')
+        qvars = { 'db_name': PgI(name) }
+        cur.execute(query.format(**qvars))
+        cur.close()
+        con.close()
 
     def exec(self, qname: str, qvars: Dict[str, Any] = None, query: str = None):
         return self._exec(Fetch.Zro, qname, qvars = qvars, query = query)
