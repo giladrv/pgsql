@@ -60,7 +60,7 @@ class PgSQL():
     def _connect(self, con_args: Dict[str, Any] = None):
         if con_args is None:
             con_args = self._con_args
-        return psycopg2.connect(con_args)
+        return psycopg2.connect(**con_args)
 
     def _exec(self, fetch: Fetch, qname: str, qvars: Dict[str, Any] = None, query: str = None):
         if query is None: query = self.read_query(qname)
