@@ -6,7 +6,6 @@ import sys
 from typing import Any, Dict, List
 # External
 import psycopg2
-from psycopg2.errors import OperationalError
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2.extras import RealDictCursor, execute_batch, execute_values
 from psycopg2.sql import Identifier as PgI, SQL as PgQ
