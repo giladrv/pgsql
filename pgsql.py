@@ -16,6 +16,13 @@ def do_iam_auth(con_args: Dict[str, Any]):
         token = RDS().iam_auth(con_args['host'], con_args['port'], con_args['user'])
         con_args['password'] = token
 
+def do_sem_auth(con_args: Dict[str, Any]):
+    if con_args['password'] == 'SEM':
+        from awspy.sem import SEM
+        secret = SEM().get_secret_json(con_args['user'])
+        con_args['user'] = secret['username']
+        con_args['password'] = secret['password']
+
 def read_con_args_from_env(env: str):
     con_args = {
         'host':     os.environ[f'{env}_DB_HOST'],
@@ -45,7 +52,7 @@ class Fetch(Enum):
 
 class PgSQL():
 
-    def __init__(self, con_args: Dict[str, Any] = None, qdir: str = 'sql', env: str = None):
+    def __init__(self, con_args: Dict[str, Any] | None = None, qdir: str = 'sql', env: str | None = None):
         if env is not None:
             con_args = read_con_args_from_env(env)
         self.con = None
@@ -61,7 +68,7 @@ class PgSQL():
             next_excepthook(etype, value, tb)
         sys.excepthook = close_on_exception
 
-    def _exec(self, fetch: Fetch, qname: str, qvars: Dict[str, Any] = None, query: str = None):
+    def _exec(self, fetch: Fetch, qname: str, qvars: Dict[str, Any] | None = None, query: str | None = None):
         if query is None: query = self.read_query(qname)
         con = self.connection()
         with con:
@@ -75,10 +82,11 @@ class PgSQL():
                     res = None
         return res
 
-    def connect(self, con_args: Dict[str, Any] = None):
+    def connect(self, con_args: Dict[str, Any] | None = None):
         if con_args is None:
             con_args = self.con_args.copy()
         do_iam_auth(con_args)
+        do_sem_auth(con_args)
         if self.tunnel is not None:
             con_args['host'] = self.tunnel.local_bind_host
             con_args['port'] = self.tunnel.local_bind_port
@@ -92,7 +100,7 @@ class PgSQL():
             self.con_last = datetime.now()
         return self.con
 
-    def create_db(self, name: str = None):
+    def create_db(self, name: str | None = None):
         if name is None:
             name = self.con_args['database']
         con_args = self.con_args.copy()
@@ -130,20 +138,20 @@ class PgSQL():
     def exec(self, qname: str, qvars: Dict[str, Any] = None, query: str = None):
         return self._exec(Fetch.Zro, qname, qvars = qvars, query = query)
 
-    def exec_batch(self, qname: str, qvars_list: List[Dict[str, Any]], query: str = None):
+    def exec_batch(self, qname: str, qvars_list: List[Dict[str, Any]], query: str | None = None):
         if query is None: query = self.read_query(qname)
         con = self.connection()
         with con:
             with con.cursor() as cur:
                 execute_batch(self, cur, query, qvars_list)
 
-    def exec_fetch_all(self, qname: str, qvars: Dict[str, Any] = None, query: str = None):
+    def exec_fetch_all(self, qname: str, qvars: Dict[str, Any] = None, query: str | None = None):
         return self._exec(Fetch.All, qname, qvars = qvars, query = query)
 
-    def exec_fetch_one(self, qname: str, qvars: Dict[str, Any] = None, query: str = None):
+    def exec_fetch_one(self, qname: str, qvars: Dict[str, Any] = None, query: str | None = None):
         return self._exec(Fetch.One, qname, qvars = qvars, query = query)
 
-    def exec_values(self, qname: str, values, query: str = None):
+    def exec_values(self, qname: str, values, query: str | None = None):
         if query is None: query = self.read_query(qname)
         con = self.connection()
         with con:
@@ -174,12 +182,17 @@ class PgSQL():
         self.tunnel.stop()
         self.tunnel = None
 
-    def verify_iam_user(self):
+    def verify_connection(self, msg: str):
         try:
             self.connect()
         except Exception as e:
-            if 'password auth' in str(e):
+            if msg in str(e):
                 return False
-            else:
-                raise e
+            raise
         return True
+
+    def verify_db_created(self):
+        return self.verify_connection(f'database "{self.con_args["database"]}" does not exist')
+
+    def verify_iam_user(self):
+        return self.verify_connection('password auth')
