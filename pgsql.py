@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 # External
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -44,6 +44,10 @@ def read_query(qdir: str, qname: str):
     with open(sql_file) as f:
         query = f.read()
     return query
+
+def sql_table_as_json(table: str, columns: Tuple[str] = ('id', 'name')):
+    obj_def = ', '.join([ f''''{col}', "{col}"''' for col in columns ])
+    return f'''{table} AS (SELECT jsonb_agg(jsonb_build_object({obj_def}) as "{table}")'''
 
 class Fetch(Enum):
     All = -1
@@ -157,6 +161,12 @@ class PgSQL():
         with con:
             with con.cursor() as cur:
                 execute_values(self, cur, query, values)
+
+    def get_tables_as_json(self, *tables: Tuple[str]):
+        q_with = ', '.join(map(sql_table_as_json, tables))
+        q_from = ', '.join(tables)
+        query = f'WITH {q_with} SELECT * FROM {q_from};'
+        return self.exec_fetch_one(None, query = query)
 
     def read_query(self, qname: str):
         if qname[0] in './':
