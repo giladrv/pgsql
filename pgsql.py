@@ -73,7 +73,8 @@ class PgSQL():
         sys.excepthook = close_on_exception
 
     def _exec(self, fetch: Fetch, qname: str, qvars: Dict[str, Any] | None = None, query: str | None = None):
-        if query is None: query = self.read_query(qname)
+        if query is None:
+            query = self.read_query(qname)
         con = self.connection()
         with con:
             with con.cursor(cursor_factory = RealDictCursor) as cur:
@@ -189,6 +190,7 @@ class PgSQL():
         self.tunnel.start()
 
     def tunnel_stop(self):
+        self.disconnect()
         self.tunnel.stop()
         self.tunnel = None
 
