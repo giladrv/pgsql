@@ -26,7 +26,7 @@ def do_sem_auth(con_args: Dict[str, Any]):
 def read_con_args_from_env(env: str):
     con_args = {
         'host':     os.environ[f'{env}_DB_HOST'],
-        'port':     os.environ[f'{env}_DB_PORT'],
+        'port':     int(os.environ[f'{env}_DB_PORT']),
         'user':     os.environ[f'{env}_DB_USER'],
         'password': os.environ[f'{env}_DB_PASS'],
         'database': os.environ[f'{env}_DB_NAME'],
