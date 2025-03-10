@@ -3,12 +3,17 @@ from datetime import datetime
 from enum import Enum
 import os
 import sys
+import time
+from traceback import print_exception
 from typing import Any, Dict, List, Tuple
 # External
 import psycopg2
+from psycopg2.errors import OperationalError
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from psycopg2.extras import RealDictCursor, execute_batch, execute_values
 from psycopg2.sql import Identifier as PgI, SQL as PgQ
+
+MAX_ATTEMPTS = 3
 
 def do_iam_auth(con_args: Dict[str, Any]):
     if con_args['password'] == 'IAM':
@@ -60,7 +65,8 @@ class PgSQL():
         if env is not None:
             con_args = read_con_args_from_env(env)
         self.con = None
-        self.con_args = con_args
+        self.orig_con_args = con_args
+        self.con_args = con_args.copy()
         self.con_last = datetime.now()
         self.qdir = qdir
         self.tunnel = None
@@ -75,17 +81,27 @@ class PgSQL():
     def _exec(self, fetch: Fetch, qname: str, qvars: Dict[str, Any] | None = None, query: str | None = None):
         if query is None:
             query = self.read_query(qname)
-        con = self.connection()
-        with con:
-            with con.cursor(cursor_factory = RealDictCursor) as cur:
-                cur.execute(query, qvars)
-                if fetch == fetch.All:
-                    res = cur.fetchall()
-                elif fetch == fetch.One:
-                    res = cur.fetchone()
-                else:
-                    res = None
-        return res
+        attempts = MAX_ATTEMPTS
+        while attempts > 0:
+            try:
+                con = self.connection()
+                with con:
+                    with con.cursor(cursor_factory = RealDictCursor) as cur:
+                        cur.execute(query, qvars)
+                        if fetch == fetch.All:
+                            res = cur.fetchall()
+                        elif fetch == fetch.One:
+                            res = cur.fetchone()
+                        else:
+                            res = None
+                return res
+            except OperationalError as e:
+                print_exception(e)
+                if attempts == 1:
+                    raise
+                self.disconnect()
+                time.sleep(8 ** (MAX_ATTEMPTS - attempts))
+                attempts -= 1
 
     def connect(self, con_args: Dict[str, Any] | None = None):
         if con_args is None:
@@ -134,6 +150,7 @@ class PgSQL():
         con.close()
 
     def disconnect(self):
+        self.con_args = self.orig_con_args.copy()
         if self.con is None:
             return
         if self.con.closed == 0:
