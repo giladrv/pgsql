@@ -70,6 +70,12 @@ class PgSQL():
         self.con_last = datetime.now()
         self.qdir = qdir
         self.tunnel = None
+        if os.environ.get(f'{env}_SSH_AUTO') == '1':
+            ssh_host = os.environ[f'{env}_SSH_HOST']
+            ssh_user = os.environ[f'{env}_SSH_USER']
+            ssh_pkey = os.environ[f'{env}_SSH_PKEY']
+            print(f'start SSH tunnel:   {ssh_user}@{ssh_host} [{ssh_pkey}]')
+            self.tunnel_start(ssh_host, ssh_user, ssh_pkey)
         # Catch unhandled exceptions and close the connection
         next_excepthook = sys.excepthook
         def close_on_exception(etype, value, tb):
