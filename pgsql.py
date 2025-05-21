@@ -59,6 +59,9 @@ class Fetch(Enum):
     Zro = 0
     One = 1
 
+class NoException(Exception):
+    pass
+
 class PgSQL():
 
     def __init__(self, con_args: Dict[str, Any] | None = None, qdir: str = 'sql', env: str | None = None):
@@ -157,6 +160,16 @@ class PgSQL():
             self.con.close()
         self.con = None
 
+    def dry_run(self, query: str, qvars: Dict[str, Any] = None):
+        con = self.connection()
+        try:
+            with con:
+                with con.cursor() as cur:
+                        cur.execute(query, qvars)
+                        raise NoException()
+        except NoException:
+            return
+
     def exec(self, qname: str, qvars: Dict[str, Any] = None, query: str = None):
         return self._exec(Fetch.Zro, qname, qvars = qvars, query = query)
 
@@ -208,6 +221,14 @@ class PgSQL():
         q_from = ', '.join(tables)
         query = f'WITH {q_with} SELECT * FROM {q_from};'
         return self.exec_fetch_one(None, query = query)
+
+    def mogrify(self, qname: str, qvars: Dict[str, Any] = None, query: str = None):
+        if query is None:
+            query = self.read_query(qname)
+        con = self.connection()
+        with con:
+            with con.cursor() as cur:
+                return cur.mogrify(query, qvars).decode()
 
     def read_query(self, qname: str):
         if qname[0] in './':
