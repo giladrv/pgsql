@@ -110,13 +110,7 @@ class PgSQL():
                 attempts -= 1
 
     def connect(self, con_args: Dict[str, Any] | None = None):
-        if con_args is None:
-            con_args = self.con_args.copy()
-        do_iam_auth(con_args)
-        do_sem_auth(con_args)
-        if self.tunnel is not None:
-            con_args['host'] = self.tunnel.local_bind_host
-            con_args['port'] = self.tunnel.local_bind_port
+        con_args = self.get_conn_args(con_args = con_args)
         return psycopg2.connect(**con_args)
 
     def connection(self):
@@ -185,6 +179,29 @@ class PgSQL():
         with con:
             with con.cursor() as cur:
                 execute_values(self, cur, query, values)
+
+    def get_conn_args(self, con_args: Dict[str, Any] | None = None):
+        if con_args is None:
+            con_args = self.con_args.copy()
+        do_iam_auth(con_args)
+        do_sem_auth(con_args)
+        if self.tunnel is not None:
+            con_args['host'] = self.tunnel.local_bind_host
+            con_args['port'] = self.tunnel.local_bind_port
+        return con_args
+
+    def get_psql_env(self, conn_args: Dict[str, Any] | None = None):
+        conn_args = self.get_conn_args(con_args = conn_args)
+        env = {
+            'PGHOST':     conn_args['host'],
+            'PGPORT':     str(conn_args['port']),
+            'PGUSER':     conn_args['user'],
+            'PGPASSWORD': conn_args['password'],
+            'PGDATABASE': conn_args['database'],
+        }
+        if 'application_name' in conn_args:
+            env['PGAPPNAME'] = conn_args['application_name']
+        return env
 
     def get_tables_as_json(self, *tables: Tuple[str]):
         q_with = ', '.join(map(sql_table_as_json, tables))
