@@ -191,7 +191,7 @@ class PgSQL():
         con = self.connection()
         with con:
             with con.cursor() as cur:
-                execute_values(self, cur, query, values)
+                execute_values(cur, query, values)
 
     def get_conn_args(self, con_args: Dict[str, Any] | None = None):
         if con_args is None:
