@@ -178,7 +178,7 @@ class PgSQL():
         con = self.connection()
         with con:
             with con.cursor() as cur:
-                execute_batch(self, cur, query, qvars_list)
+                execute_batch(cur, query, qvars_list)
 
     def exec_fetch_all(self, qname: str, qvars: Dict[str, Any] = None, query: str | None = None):
         return self._exec(Fetch.All, qname, qvars = qvars, query = query)
