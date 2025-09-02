@@ -178,9 +178,10 @@ class PgSQL():
 
     def exec(self, qname: str,
             qvars: Dict[str, Any] = None,
-            query: str = None
+            query: str = None,
+            set_pairs: Dict[str, Any] | None = None
         ):
-        return self._exec(Fetch.Zro, qname, qvars = qvars, query = query)
+        return self._exec(Fetch.Zro, qname, qvars = qvars, query = query, set_pairs = set_pairs)
 
     def exec_batch(self, qname: str, qvars_list: List[Dict[str, Any]],
             query: str | None = None,
