@@ -87,9 +87,15 @@ class PgSQL():
             next_excepthook(etype, value, tb)
         sys.excepthook = close_on_exception
 
-    def _exec(self, fetch: Fetch, qname: str, qvars: Dict[str, Any] | None = None, query: str | None = None):
+    def _exec(self, fetch: Fetch, qname: str,
+            qvars: Dict[str, Any] | None = None,
+            query: str | None = None,
+            set_pairs: Dict[str, Any] | None = None
+        ):
         if query is None:
-            query = self.read_query(qname)
+            query = self.read_query(qname, set_pairs = set_pairs)
+        if set_pairs is not None:
+            qvars = qvars | set_pairs
         attempts = MAX_ATTEMPTS
         while attempts > 0:
             try:
@@ -170,21 +176,34 @@ class PgSQL():
         except NoException:
             return
 
-    def exec(self, qname: str, qvars: Dict[str, Any] = None, query: str = None):
+    def exec(self, qname: str,
+            qvars: Dict[str, Any] = None,
+            query: str = None
+        ):
         return self._exec(Fetch.Zro, qname, qvars = qvars, query = query)
 
-    def exec_batch(self, qname: str, qvars_list: List[Dict[str, Any]], query: str | None = None):
+    def exec_batch(self, qname: str, qvars_list: List[Dict[str, Any]],
+            query: str | None = None,
+        ):
         if query is None: query = self.read_query(qname)
         con = self.connection()
         with con:
             with con.cursor() as cur:
                 execute_batch(cur, query, qvars_list)
 
-    def exec_fetch_all(self, qname: str, qvars: Dict[str, Any] = None, query: str | None = None):
-        return self._exec(Fetch.All, qname, qvars = qvars, query = query)
+    def exec_fetch_all(self, qname: str,
+            qvars: Dict[str, Any] = None,
+            query: str | None = None,
+            set_pairs: Dict[str, Any] | None = None
+        ):
+        return self._exec(Fetch.All, qname, qvars = qvars, query = query, set_pairs = set_pairs)
 
-    def exec_fetch_one(self, qname: str, qvars: Dict[str, Any] = None, query: str | None = None):
-        return self._exec(Fetch.One, qname, qvars = qvars, query = query)
+    def exec_fetch_one(self, qname: str,
+            qvars: Dict[str, Any] = None,
+            query: str | None = None,
+            set_pairs: Dict[str, Any] | None = None
+        ):
+        return self._exec(Fetch.One, qname, qvars = qvars, query = query, set_pairs = set_pairs)
 
     def exec_values(self, qname: str, values, query: str | None = None):
         if query is None: query = self.read_query(qname)
@@ -230,7 +249,7 @@ class PgSQL():
             with con.cursor() as cur:
                 return cur.mogrify(query, qvars).decode()
 
-    def read_query(self, qname: str):
+    def read_query(self, qname: str, set_pairs: Dict[str, Any] = None):
         if qname[0] in './':
             sql_file = qname
         else:
@@ -239,6 +258,9 @@ class PgSQL():
             raise Exception(f'SQL `{qname}` not defined!')
         with open(sql_file) as f:
             query = f.read()
+        if set_pairs is not None:
+            set_pairs = ''.join([ f'\n    "{key}" = %({key})s,' for key in set_pairs ])
+            query = query.replace('{SET_PAIRS}', set_pairs)
         return query
 
     def tunnel_start(self, ssh_host: str, ssh_user: str, ssh_pkey: str):
