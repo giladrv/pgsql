@@ -2,6 +2,7 @@
 from datetime import datetime
 from enum import Enum
 import os
+import re
 import sys
 import time
 from traceback import print_exception
@@ -260,7 +261,8 @@ class PgSQL():
         with open(sql_file) as f:
             query = f.read()
         if set_pairs is not None:
-            set_pairs = ''.join([ f'\n    "{key}" = %({key})s,' for key in set_pairs ])
+            pad = re.search(r'\{SET_PAIRS\}(?P<pad>\s+)', query).group('pad')
+            set_pairs = ''.join([ f'{pad}"{key}" = %({key})s,' for key in set_pairs ])
             query = query.replace('{SET_PAIRS}', set_pairs)
         return query
 
